@@ -4,10 +4,16 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Security.Cryptography.X509Certificates;
 using System.Linq;
+int i = 0;
+List<int> tulokset = new List<int>();
+while (i < 100)
+{
+    Game peli_testi = new Game();
+    peli_testi.play();
+    i++;
+}
 
-Game peli_testi = new Game();
-peli_testi.play();
-
+//Määritellään kortti
 public class Card
 {
     public int arvo;
@@ -24,6 +30,7 @@ public class Card
     }
 }
 
+//Määritellään korttipakka
 public class Deck
 {
     int lkm = 6;
@@ -36,14 +43,21 @@ public class Deck
             for (int j = 0; j < 4; j++)
             {
                 for (int k = 0; k < 13; k++)
-                {
-                    deck.Add(new Card(k, j));
+                {   if (k > 10)
+                    {
+                        deck.Add(new Card(10, j));
+                    }
+                    else {
+                        deck.Add(new Card(k, j));
+                    }
+                    
                 }
             }
         }
 
     }
 
+    //Korttipakan toiminto, joka sekoittaa kortit
     public void suffle()
     {
         Random rnd = new Random();
@@ -63,13 +77,15 @@ public class Deck
 
 }
 
+//Määritellään pelaaja
 public class Player
 {
     public string name;
     public float bank;
-    public bool stay;
     public List<Card> hand = new List<Card>();
+    //Tässä on kaikki kortit, jotka pelaaja on nähnyt
     public List<Card> all = new List<Card>();
+    //Korttien laskun säilytys
     public int count = 0;
 
     public Player(string n, float b)
@@ -87,117 +103,50 @@ public class Player
         }
     }
 
-    public int bet_amount(int minimum)
+    //Pelaajan logiikkaa, joka on ainakin panoksen asettamisen kannalta täyttä paskaa
+    public int get_count(int decks_remaining)
     {
 
-        for (int i = 0; i < all.Count; i++)
+        foreach (var card in all)
         {
-            if (all[i].arvo > 1 && all[i].arvo < 6)
+            if (card.arvo > 2 && card.arvo < 7)
             {
                 count++;
             }
-            else if (all[i].arvo > 9)
+            else if (card.arvo > 6 && card.arvo < 10)
+            {
+          
+            }
+            else if (card.arvo > 9)
             {
                 count--;
             }
-
         }
-        bank -= minimum;
-        return minimum;
+
+        return count / decks_remaining;
     }
 
-    public int CalculateHandTotal(List<Card> hand)
+    //Tässä tehdään päätös otetaanko lisää kortteja vai ei
+    public int stay(Card dealers_hand)
     {
-        int total = 0;
-        int aceCount = 0;
-
-        foreach (var card in hand)
+        int total = hand.Sum(card => card.arvo);
+        if (total > 16 && dealers_hand.arvo > 6) 
         {
-            if (card.arvo == 1)
-            {
-                aceCount++;
-                total += 11;
-            }
-            else if (card.arvo > 10)
-            {
-                total += 10;
-            }
-            else
-            {
-                total += card.arvo;
-            }
+            return 0;
         }
-
-        while (total > 21 && aceCount > 0)
+        else if (dealers_hand.arvo < 7 && total > 14) 
         {
-            total -= 10;
-            aceCount--;
+            return 0;
         }
-
-        return total;
-    }
-
-    public int dec(Deck cards)
-    {
-        int total = CalculateHandTotal(hand);
-        int decksRemaining = cards.deck.Count / 52;
-        int trueCount = count / decksRemaining;  // Assume `count` is available here
-
-        if (total <= 8)
+        else
         {
             return 1;
         }
-        else if (total == 9)
-        {
-            return trueCount >= 3 ? 1 : 0;
-        }
-        else if (total == 10)
-        {
-            return trueCount >= 4 ? 1 : 0;
-        }
-        else if (total >= 12 && total <= 16)
-        {
-            return trueCount >= 0 ? 0 : 1;
-        }
-        else if (total >= 17)
-        {
-            return 0;
-        }
-        else if (hand.Any(c => c.arvo == 1) && total >= 13 && total <= 14)
-        {
-            return trueCount >= 5 ? 1 : 0;
-        }
-        else if (hand.Any(c => c.arvo == 1) && total >= 15 && total <= 16)
-        {
-            return trueCount >= 4 ? 1 : 0;
-        }
-        else if (hand.Any(c => c.arvo == 1) && total == 17)
-        {
-            return trueCount >= 3 ? 1 : 0;
-        }
-        else if (hand.Any(c => c.arvo == 1) && total == 18)
-        {
-            if (trueCount < 3)
-            {
-                return 1;
-            }
-            else if (trueCount >= 4)
-            {
-                return 1;
-            }
-            return 0;
-        }
-        else if (hand.Any(c => c.arvo == 1) && (total == 19 || total == 20))
-        {
-            return 0;
-        }
-        // Add further conditions for pairs, if required
-
-        return 0; // Default action
     }
 }
 
 
+//Määritellään peli, joka on tässä tapauksessa black jack
 public class Game
 {
 
@@ -208,59 +157,55 @@ public class Game
     public int bet = 0;
     public List<int> wieners = new List<int>();
 
+    //Pelin logiikka
     public void play()
     {
-        start();
         while (cards.deck.Count > 78)
         {
             start();
         };
+        //Paljonko jäi käteen?
         Console.WriteLine(pelaaja.bank);
+        
     }
-    public void print_deck()
+
+    public void start()
     {
-        for (int i = 0; i < cards.deck.Count(); i++)
+        cards.suffle();
+
+        int temp = pelaaja.get_count(cards.deck.Count() / 52);
+        if (temp > 0)
         {
-            cards.deck[i].print_card();
+            bet = min_bet + temp;
+            pelaaja.bank -= bet;
         }
-    }
-    public void print_dealers_hand()
-    {
-        Console.WriteLine("Dealers hand: ", hand.Count());
-        for (int i = 0; i < hand.Count(); i++)
+        else
         {
-            hand[i].print_card();
+            bet = min_bet;
+            pelaaja.bank -= bet;
         }
+
+        more(hand);
+        for (int i = 0; i < 2; i++)
+        {
+            more(pelaaja.hand);
+        }
+
+        deal();
+
     }
-    public int get_hand_total(List<Card> temp)
-    {
-        return temp.Sum(card => card.arvo);
-    }
+
     public void more(List<Card> temp)
     {
         temp.Add(cards.deck[0]);
         pelaaja.all.Add(cards.deck[0]);
         cards.deck.RemoveAt(0);
     }
-    public void start()
-    {
-        cards.suffle();
-        bet = pelaaja.bet_amount(min_bet);
-        //Panoksen asettamiseen tarvitaan logiikka
-        for (int i = 0; i < 2; i++)
-        {
 
-            more(pelaaja.hand);
-            more(hand);
-        }
-
-        deal();
-
-    }
     public void deal()
     {
 
-        if (pelaaja.dec(cards) == 1)
+        if (pelaaja.stay(hand[0]) == 1)
         {
             more(pelaaja.hand);
         }
@@ -273,6 +218,7 @@ public class Game
         }
         end();
     }
+
     public void end()
     {
         int w = wiener();
@@ -291,12 +237,12 @@ public class Game
         wieners.Add(wiener());
         clear();
     }
+
     public int wiener()
     {
         int playerTotal = get_hand_total(pelaaja.hand);
         int dealerTotal = get_hand_total(hand);
 
-        // Check for busts
         if (playerTotal > 21)
         {
             return 0;
@@ -306,17 +252,15 @@ public class Game
             return 1;
         }
 
-        // Check for blackjacks
         if (playerTotal == 21 && pelaaja.hand.Count == 2)
         {
-            return 1; // Player has a blackjack
+            return 1;
         }
         else if (dealerTotal == 21 && hand.Count == 2)
         {
-            return 0; // Dealer has a blackjack
+            return 0;
         }
 
-        // Compare hand totals
         if (playerTotal > dealerTotal)
         {
             return 1;
@@ -327,14 +271,30 @@ public class Game
         }
         else
         {
-            return 99; // Tie
+            return 99;
         }
     }
+
+    public int get_hand_total(List<Card> temp)
+    {
+        return temp.Sum(card => card.arvo);
+    }
+
     public void clear()
     {
         pelaaja.hand.Clear();
         hand.Clear();
     }
+
+    public void print_dealers_hand()
+    {
+        Console.WriteLine("Dealers hand: ", hand.Count());
+        for (int i = 0; i < hand.Count(); i++)
+        {
+            hand[i].print_card();
+        }
+    }
+
 }
 
 
